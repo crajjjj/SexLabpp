@@ -10,8 +10,7 @@ namespace Thread::Collision
       public:
         static void Install();
         static void AddActor(RE::FormID a_actor);
-        // Returns false for an actor this session never added, i.e. one that came out of a save made mid scene
-        static bool RemoveActor(RE::FormID a_actor);
+        static void RemoveActor(RE::FormID a_actor);
         static void Clear();
 
         [[nodiscard]] static bool HasActor(RE::FormID a_actor);
