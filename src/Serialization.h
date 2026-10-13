@@ -3,7 +3,6 @@
 #include "Papyrus/sslLibrary/Serialize.h"
 #include "Registry/Stats.h"
 #include "Thread/Collision/CollisionHandler.h"
-#include "Thread/Thread.h"
 
 namespace Serialization
 {
@@ -28,8 +27,7 @@ namespace Serialization
             _Version = 1,
 
             _Statistics = 'stcs',
-            _Tracking = 'trcn',
-            _PreparedActors = 'prep'
+            _Tracking = 'trcn'
         };
 
         static void SaveCallback(SKSE::SerializationInterface* a_intfc)
@@ -43,7 +41,6 @@ namespace Serialization
     }
             SAVE(_Statistics, Registry::Statistics::StatisticsData::GetSingleton()->Save(a_intfc))
             SAVE(_Tracking, Papyrus::Tracking::GetSingleton()->Save(a_intfc))
-            SAVE(_PreparedActors, Thread::Instance::SavePreparedActors(a_intfc))
 
 #undef SAVE
         }
@@ -65,9 +62,6 @@ namespace Serialization
                 case _Tracking:
                     Papyrus::Tracking::GetSingleton()->Load(a_intfc);
                     break;
-                case _PreparedActors:
-                    Thread::Instance::LoadPreparedActors(a_intfc);
-                    break;
                 default:
                     break;
                 }
@@ -79,7 +73,6 @@ namespace Serialization
         static void RevertCallback(SKSE::SerializationInterface* a_intfc)
         {
             Thread::Collision::CollisionHandler::Clear();
-            Thread::Instance::RevertPreparedActors();
             Registry::Statistics::StatisticsData::GetSingleton()->Revert(a_intfc);
             Papyrus::Tracking::GetSingleton()->Revert(a_intfc);
         }

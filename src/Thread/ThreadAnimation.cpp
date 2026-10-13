@@ -137,68 +137,30 @@ namespace Thread
         RestorePreparedActorState(a_linkedQst);
     }
 
-    // The preparation table has to survive a save made mid scene: the scripts end that scene after the load,
-    // and without the table the native half of the restore (scale, life state, graph variables) never runs
-    void Instance::SavePreparedActors(SKSE::SerializationInterface* a_intfc)
+    // Saves made mid scene have no thread to restore their actors. Scale persists in SKEE's co-save and life state
+    // in the game's save, with the original status in Variable05. Papyrus restores the graph variables
+    void Instance::RestoreActorsAfterLoad()
     {
-        std::scoped_lock lock{ actorPreparationLock };
-        const auto count = static_cast<uint32_t>(actorPreparations.size());
-        if (!a_intfc->WriteRecordData(count)) {
-            logger::error("Failed to save the number of prepared actors");
-            return;
-        }
-        for (const auto& [actorID, preparation] : actorPreparations) {
-            const RE::FormID ownerID = preparation.owner ? preparation.owner->GetFormID() : 0;
-            a_intfc->WriteRecordData(actorID);
-            a_intfc->WriteRecordData(ownerID);
-            a_intfc->WriteRecordData(preparation.lifeState);
-            a_intfc->WriteRecordData(preparation.isNPC);
-            a_intfc->WriteRecordData(preparation.humanoidFootIKDisabled);
-            a_intfc->WriteRecordData(preparation.hasIsNPC);
-            a_intfc->WriteRecordData(preparation.hasHumanoidFootIKDisabled);
-        }
-    }
-
-    void Instance::LoadPreparedActors(SKSE::SerializationInterface* a_intfc)
-    {
-        uint32_t count = 0;
-        if (a_intfc->ReadRecordData(count) != sizeof(count)) {
-            logger::error("Failed to load the number of prepared actors");
-            return;
-        }
-        std::scoped_lock lock{ actorPreparationLock };
-        for (uint32_t i = 0; i < count; i++) {
-            RE::FormID actorID = 0, ownerID = 0;
-            ActorPreparation preparation{};
-            if (a_intfc->ReadRecordData(actorID) != sizeof(actorID)) {
-                logger::error("Prepared actor record ends early, read {} of {}", i, count);
-                break;
+        const auto faction = const_cast<RE::TESFaction*>(GameForms::AnimatingFaction);
+        const auto restore = [&](RE::Actor* a_actor) {
+            if (!a_actor || a_actor->GetFactionRank(faction, a_actor->IsPlayerRef()) <= 0) {
+                return RE::BSContainer::ForEachResult::kContinue;
             }
-            a_intfc->ReadRecordData(ownerID);
-            a_intfc->ReadRecordData(preparation.lifeState);
-            a_intfc->ReadRecordData(preparation.isNPC);
-            a_intfc->ReadRecordData(preparation.humanoidFootIKDisabled);
-            a_intfc->ReadRecordData(preparation.hasIsNPC);
-            a_intfc->ReadRecordData(preparation.hasHumanoidFootIKDisabled);
-
-            RE::FormID newActorID = 0, newOwnerID = 0;
-            if (!a_intfc->ResolveFormID(actorID, newActorID) || !a_intfc->ResolveFormID(ownerID, newOwnerID)) {
-                continue;
+            Registry::Scale::GetSingleton()->RemoveScale(a_actor);
+            const auto actorState = a_actor->AsActorState();
+            if (!a_actor->IsPlayerRef() && actorState->GetLifeState() == RE::ACTOR_LIFE_STATE::kRestrained) {
+                const auto values = a_actor->AsActorValueOwner();
+                const auto status = static_cast<int32_t>(values->GetActorValue(RE::ActorValue::kVariable05));
+                actorState->actorState1.lifeState = status == ActorStatus::Unconscious ? RE::ACTOR_LIFE_STATE::kUnconcious : RE::ACTOR_LIFE_STATE::kAlive;
+                values->SetActorValue(RE::ActorValue::kVariable05, 0.0f);
             }
-            preparation.actor = RE::TESForm::LookupByID<RE::Actor>(newActorID);
-            preparation.owner = RE::TESForm::LookupByID<RE::TESQuest>(newOwnerID);
-            if (!preparation.actor || !preparation.owner) {
-                continue;
-            }
-            actorPreparations.insert_or_assign(newActorID, preparation);
+            logger::info("Restored actor {:X} from a save made mid scene.", a_actor->GetFormID());
+            return RE::BSContainer::ForEachResult::kContinue;
+        };
+        restore(RE::PlayerCharacter::GetSingleton());
+        if (const auto processLists = RE::ProcessLists::GetSingleton()) {
+            processLists->ForEachHighActor(restore);
         }
-        logger::info("Loaded {} natively prepared actor(s)", actorPreparations.size());
-    }
-
-    void Instance::RevertPreparedActors()
-    {
-        std::scoped_lock lock{ actorPreparationLock };
-        actorPreparations.clear();
     }
 
     void Instance::CancelPendingAnimations(RE::TESQuest* a_linkedQst)
