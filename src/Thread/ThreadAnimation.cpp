@@ -5,6 +5,7 @@
 #include "Thread/Collision/CollisionHandler.h"
 #include "Thread/Hooks.h"
 #include "Util/Script.h"
+#include "Util/World.h"
 
 #include <bit>
 
@@ -176,26 +177,36 @@ namespace Thread
         }
     }
 
-    bool Instance::ReleaseActorAfterLoad(RE::Actor* a_actor)
+    void Instance::ReleaseActorAfterLoad(RE::Actor* a_actor)
     {
         {
             std::scoped_lock lock{ loadedActorLock };
             if (std::erase(loadedActors, a_actor->GetFormID()) == 0) {
-                return false;
+                return;
             }
         }
-        // Cleared here so this does not depend on what the collision handler's unlock restores
-        if (const auto controller = a_actor->GetCharController()) {
-            controller->flags.reset(
-                RE::CHARACTER_FLAGS::kNoGravityOnGround,
-                RE::CHARACTER_FLAGS::kNoSim,
-                RE::CHARACTER_FLAGS::kNotPushablePermanent);
-            controller->flags.set(
-                RE::CHARACTER_FLAGS::kSupport,
-                RE::CHARACTER_FLAGS::kCheckSupport);
-            controller->context.currentState = RE::hkpCharacterStateType::kOnGround;
-        }
-        return true;
+        // Queued, so it runs on the main thread after an unlock the collision handler queued itself. The free spot search
+        // reads every actor's bounds from its character controller, which has none while it is out of the world
+        SKSE::GetTaskInterface()->AddTask([handle = a_actor->GetHandle()]() {
+            const auto actor = handle.get();
+            if (!actor) {
+                return;
+            }
+            // Cleared here so this does not depend on what the collision handler's unlock restores
+            if (const auto controller = actor->GetCharController()) {
+                controller->flags.reset(
+                    RE::CHARACTER_FLAGS::kNoGravityOnGround,
+                    RE::CHARACTER_FLAGS::kNoSim,
+                    RE::CHARACTER_FLAGS::kNotPushablePermanent);
+                controller->flags.set(
+                    RE::CHARACTER_FLAGS::kSupport,
+                    RE::CHARACTER_FLAGS::kCheckSupport);
+                controller->context.currentState = RE::hkpCharacterStateType::kOnGround;
+            }
+            // The thread was stopped without playing the end of the scene. The actor still sits at the scene position,
+            // inside the furniture and the other actors
+            Util::World::MoveToFreeNavmesh(actor.get());
+        });
     }
 
     void Instance::ClearActorsAfterLoad()

@@ -69,8 +69,9 @@ namespace Thread
         static void DispatchContinueSetup(RE::TESQuest* a_linkedQst, bool a_result);
         static void UpdateAnimations(float a_delta);
         static void RestoreActorsAfterLoad();
-        // Returns true for an actor RestoreActorsAfterLoad locked again, once, and clears its saved controller flags
-        static bool ReleaseActorAfterLoad(RE::Actor* a_actor);
+        // For an actor RestoreActorsAfterLoad locked again, once: clears its saved controller flags and moves it off the
+        // scene position
+        static void ReleaseActorAfterLoad(RE::Actor* a_actor);
         static void ClearActorsAfterLoad();
 
       public:
