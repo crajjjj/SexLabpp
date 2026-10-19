@@ -152,7 +152,7 @@ namespace Papyrus::ActorLibrary
         const auto areas = Registry::Library::GetSingleton()->GetFxAreas(a_actor, fxType, asSet);
         std::vector<RE::BSFixedString> ret{};
         for (const auto& [area, name] : magic_enum::enum_entries<Registry::Library::FxArea>()) {
-            if (areas & std::to_underlying(area)) {
+            if (areas.all(area)) {
                 ret.emplace_back(name);
             }
         }

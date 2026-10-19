@@ -19,16 +19,16 @@ namespace Registry
         std::optional<std::vector<CumFxTextureSource>> textures;
     };
 
-    // FxArea bits for a list of area names, 0 if the list is empty or names an unknown area
-    static uint8_t ParseFxAreas(const std::vector<std::string>& a_names)
+    // Areas for a list of area names, empty if the list is empty or names an unknown area
+    static REX::EnumSet<Library::FxArea> ParseFxAreas(const std::vector<std::string>& a_names)
     {
-        uint8_t areas = 0;
+        REX::EnumSet<Library::FxArea> areas{};
         for (const auto& name : a_names) {
             const auto area = magic_enum::enum_cast<Library::FxArea>(name, magic_enum::case_insensitive);
             if (!area) {
-                return 0;
+                return {};
             }
-            areas |= std::to_underlying(*area);
+            areas.set(*area);
         }
         return areas;
     }
@@ -437,7 +437,7 @@ namespace Registry
                     auto areas = DefaultFxAreas(*type);
                     if (texture.areas) {
                         areas = ParseFxAreas(*texture.areas);
-                        if (areas == 0) {
+                        if (!areas) {
                             logger::error("CumFx config {} has invalid areas for {}", filename, texture.path);
                             valid = false;
                             break;

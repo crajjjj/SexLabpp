@@ -47,17 +47,20 @@ namespace Registry
         };
 
         // Areas of a profile whose config does not list any
-        constexpr static uint8_t DefaultFxAreas(FxType a_type)
+        constexpr static REX::EnumSet<FxArea> DefaultFxAreas(FxType a_type)
         {
-            const auto body = std::to_underlying(FxArea::Body) | std::to_underlying(FxArea::Hands) | std::to_underlying(FxArea::Feet);
-            return static_cast<uint8_t>(a_type == FxType::Oral ? body | std::to_underlying(FxArea::Face) : body);
+            REX::EnumSet<FxArea> areas{ FxArea::Body, FxArea::Hands, FxArea::Feet };
+            if (a_type == FxType::Oral) {
+                areas.set(FxArea::Face);
+            }
+            return areas;
         }
 
         struct FxProfile
         {
             RE::BSFixedString path;
             uint8_t layerCount;
-            uint8_t areas;  // FxArea bits
+            REX::EnumSet<FxArea> areas;
         };
 
         struct FxConfig
@@ -120,7 +123,7 @@ namespace Registry
       public:
         RE::BSFixedString PickRandomFxSet(RE::Actor* a_actor, FxType a_type) const;
         uint8_t GetFxCount(FxType a_type, RE::BSFixedString a_set) const;
-        uint8_t GetFxAreas(RE::Actor* a_actor, FxType a_type, RE::BSFixedString a_set) const;
+        REX::EnumSet<FxArea> GetFxAreas(RE::Actor* a_actor, FxType a_type, RE::BSFixedString a_set) const;
 
       public:
         _NODISCARD const FurnitureDetails* GetFurnitureDetails(const RE::TESObjectREFR* a_ref) const;

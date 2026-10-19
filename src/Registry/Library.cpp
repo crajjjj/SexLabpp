@@ -569,7 +569,7 @@ namespace Registry
         return 0;
     }
 
-    uint8_t Library::GetFxAreas(RE::Actor* a_actor, FxType a_type, RE::BSFixedString a_set) const
+    REX::EnumSet<Library::FxArea> Library::GetFxAreas(RE::Actor* a_actor, FxType a_type, RE::BSFixedString a_set) const
     {
         const auto typeIdx = static_cast<size_t>(a_type);
         const auto find = [&](const FxConfig& a_config) -> const FxProfile* {
