@@ -105,6 +105,7 @@ namespace Thread::Collision
     {
         const std::unique_lock lock{ _mutex };
         _cache.clear();
+        _loaded.clear();
     }
 
     bool CollisionHandler::HasActor(RE::FormID a_actor)
@@ -302,19 +303,28 @@ namespace Thread::Collision
         SetFootIKEnabled(actor, false);
     }
 
+    void CollisionHandler::AddLoadedActor(RE::FormID a_actor)
+    {
+        AddActor(a_actor);
+        const std::unique_lock lock{ _mutex };
+        if (!std::ranges::contains(_loaded, a_actor))
+            _loaded.push_back(a_actor);
+    }
+
     bool CollisionHandler::RemoveActor(RE::FormID a_actor)
     {
         const std::unique_lock lock{ _mutex };
-        const auto wasCached = std::erase(_cache, a_actor) != 0;
+        if (std::erase(_cache, a_actor) == 0) {
+            return false;
+        }
+        const auto loaded = std::erase(_loaded, a_actor) != 0;
 
         auto* actor = RE::TESForm::LookupByID<RE::Actor>(a_actor);
         if (!actor)
-            return wasCached;
+            return loaded;
 
-        // An actor from a save made mid scene is not in the cache, but it comes back the way the scene left it
-        // (swimming state, no gravity, no simulation, foot IK off), so it gets the same restore
         SetFootIKEnabled(actor, true);
         RestoreRigidBodyPhysics(actor);
-        return wasCached;
+        return loaded;
     }
 }

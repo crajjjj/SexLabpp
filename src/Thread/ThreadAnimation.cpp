@@ -138,7 +138,8 @@ namespace Thread
     }
 
     // Saves made mid scene have no thread to restore their actors. Scale persists in SKEE's co-save and life state
-    // in the game's save, with the original status in Variable05. Papyrus restores the graph variables
+    // in the game's save, with the original status in Variable05. Papyrus restores the graph variables. The character
+    // controller also keeps the scene's flags, so the actor is locked again and the unlock that follows restores it
     void Instance::RestoreActorsAfterLoad()
     {
         const auto faction = const_cast<RE::TESFaction*>(GameForms::AnimatingFaction);
@@ -154,6 +155,7 @@ namespace Thread
                 actorState->actorState1.lifeState = status == ActorStatus::Unconscious ? RE::ACTOR_LIFE_STATE::kUnconcious : RE::ACTOR_LIFE_STATE::kAlive;
                 values->SetActorValue(RE::ActorValue::kVariable05, 0.0f);
             }
+            Collision::CollisionHandler::AddLoadedActor(a_actor->GetFormID());
             logger::info("Restored actor {:X} from a save made mid scene.", a_actor->GetFormID());
             return RE::BSContainer::ForEachResult::kContinue;
         };
