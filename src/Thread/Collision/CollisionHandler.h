@@ -10,10 +10,7 @@ namespace Thread::Collision
       public:
         static void Install();
         static void AddActor(RE::FormID a_actor);
-        // For an actor a save made mid scene left in the scene's state. Locked like AddActor, until its thread unlocks it
-        static void AddLoadedActor(RE::FormID a_actor);
-        // Returns true for an actor added by AddLoadedActor
-        static bool RemoveActor(RE::FormID a_actor);
+        static void RemoveActor(RE::FormID a_actor);
         static void Clear();
 
         [[nodiscard]] static bool HasActor(RE::FormID a_actor);
@@ -36,7 +33,6 @@ namespace Thread::Collision
         static inline REL::Relocation<decltype(Hook_ApplyMovementDelta)> _originalApplyMovementDelta;
 
         static inline std::vector<RE::FormID> _cache;
-        static inline std::vector<RE::FormID> _loaded;
         static inline std::shared_mutex _mutex;
     };
 }

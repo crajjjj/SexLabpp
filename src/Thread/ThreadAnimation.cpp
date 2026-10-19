@@ -32,6 +32,10 @@ namespace Thread
         std::mutex actorPreparationLock;
         std::unordered_map<RE::FormID, ActorPreparation> actorPreparations;
 
+        // Actors RestoreActorsAfterLoad locked again, until their thread unlocks them
+        std::mutex loadedActorLock;
+        std::vector<RE::FormID> loadedActors;
+
         bool IsPlayerDialogueActive()
         {
             const auto ui = RE::UI::GetSingleton();
@@ -139,7 +143,8 @@ namespace Thread
 
     // Saves made mid scene have no thread to restore their actors. Scale persists in SKEE's co-save and life state
     // in the game's save, with the original status in Variable05. Papyrus restores the graph variables. The character
-    // controller also keeps the scene's flags, so the actor is locked again and the unlock that follows restores it
+    // controller also keeps the scene's flags, so the actor is locked again until its thread unlocks it, and
+    // ReleaseActorAfterLoad then clears them
     void Instance::RestoreActorsAfterLoad()
     {
         const auto faction = const_cast<RE::TESFaction*>(GameForms::AnimatingFaction);
@@ -155,7 +160,13 @@ namespace Thread
                 actorState->actorState1.lifeState = status == ActorStatus::Unconscious ? RE::ACTOR_LIFE_STATE::kUnconcious : RE::ACTOR_LIFE_STATE::kAlive;
                 values->SetActorValue(RE::ActorValue::kVariable05, 0.0f);
             }
-            Collision::CollisionHandler::AddLoadedActor(a_actor->GetFormID());
+            Collision::CollisionHandler::AddActor(a_actor->GetFormID());
+            {
+                std::scoped_lock lock{ loadedActorLock };
+                if (!std::ranges::contains(loadedActors, a_actor->GetFormID())) {
+                    loadedActors.push_back(a_actor->GetFormID());
+                }
+            }
             logger::info("Restored actor {:X} from a save made mid scene.", a_actor->GetFormID());
             return RE::BSContainer::ForEachResult::kContinue;
         };
@@ -163,6 +174,34 @@ namespace Thread
         if (const auto processLists = RE::ProcessLists::GetSingleton()) {
             processLists->ForEachHighActor(restore);
         }
+    }
+
+    bool Instance::ReleaseActorAfterLoad(RE::Actor* a_actor)
+    {
+        {
+            std::scoped_lock lock{ loadedActorLock };
+            if (std::erase(loadedActors, a_actor->GetFormID()) == 0) {
+                return false;
+            }
+        }
+        // Cleared here so this does not depend on what the collision handler's unlock restores
+        if (const auto controller = a_actor->GetCharController()) {
+            controller->flags.reset(
+                RE::CHARACTER_FLAGS::kNoGravityOnGround,
+                RE::CHARACTER_FLAGS::kNoSim,
+                RE::CHARACTER_FLAGS::kNotPushablePermanent);
+            controller->flags.set(
+                RE::CHARACTER_FLAGS::kSupport,
+                RE::CHARACTER_FLAGS::kCheckSupport);
+            controller->context.currentState = RE::hkpCharacterStateType::kOnGround;
+        }
+        return true;
+    }
+
+    void Instance::ClearActorsAfterLoad()
+    {
+        std::scoped_lock lock{ loadedActorLock };
+        loadedActors.clear();
     }
 
     void Instance::CancelPendingAnimations(RE::TESQuest* a_linkedQst)

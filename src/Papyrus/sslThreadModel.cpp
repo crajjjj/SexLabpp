@@ -78,8 +78,9 @@ namespace Papyrus::ThreadModel
                 handler->AddActor(formID);
                 // actor->SetCollision(false);
             } else {
+                handler->RemoveActor(formID);
                 // actor->SetCollision(true);
-                if (handler->RemoveActor(formID)) {
+                if (Thread::Instance::ReleaseActorAfterLoad(actor)) {
                     // The scene was loaded from a save, and its thread was stopped without playing the end of the scene. The
                     // actor still sits at the scene position, inside the furniture and the other actors
                     Util::World::MoveToFreeNavmesh(actor);

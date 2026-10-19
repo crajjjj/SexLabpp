@@ -105,7 +105,6 @@ namespace Thread::Collision
     {
         const std::unique_lock lock{ _mutex };
         _cache.clear();
-        _loaded.clear();
     }
 
     bool CollisionHandler::HasActor(RE::FormID a_actor)
@@ -303,28 +302,18 @@ namespace Thread::Collision
         SetFootIKEnabled(actor, false);
     }
 
-    void CollisionHandler::AddLoadedActor(RE::FormID a_actor)
-    {
-        AddActor(a_actor);
-        const std::unique_lock lock{ _mutex };
-        if (!std::ranges::contains(_loaded, a_actor))
-            _loaded.push_back(a_actor);
-    }
-
-    bool CollisionHandler::RemoveActor(RE::FormID a_actor)
+    void CollisionHandler::RemoveActor(RE::FormID a_actor)
     {
         const std::unique_lock lock{ _mutex };
         if (std::erase(_cache, a_actor) == 0) {
-            return false;
+            return;
         }
-        const auto loaded = std::erase(_loaded, a_actor) != 0;
 
         auto* actor = RE::TESForm::LookupByID<RE::Actor>(a_actor);
         if (!actor)
-            return loaded;
+            return;
 
         SetFootIKEnabled(actor, true);
         RestoreRigidBodyPhysics(actor);
-        return loaded;
     }
 }
